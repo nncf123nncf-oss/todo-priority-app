@@ -65,6 +65,8 @@ select {
   border-radius: 8px;
   background: #fff;
   width: 100%;
+  max-width: 100%;
+  min-width: 0; /* input[type=date]はブラウザ標準UIの内部幅がwidth指定を無視してはみ出すことがあるため明示的に許可する */
 }
 
 input:focus,
@@ -202,6 +204,8 @@ select:focus {
   }
 
   .field {
-    min-width: 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 }
