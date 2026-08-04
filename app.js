@@ -12,6 +12,14 @@ const emptyMessage = document.getElementById("empty-message");
 const PRIORITY_LABELS = { high: "高", medium: "中", low: "低" };
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 
+// crypto.randomUUID が使えない環境（古いブラウザ等）向けのフォールバック付きID生成
+function createTaskId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 // ---------- localStorage ----------
 const STORAGE_KEY = "todo-priority-app.tasks";
 
@@ -21,15 +29,21 @@ function loadTasks() {
     const parsed = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return [];
     // 壊れたデータが混ざっていても落ちないよう、形を検証して取り込む
+    const seenIds = new Set();
     return parsed
       .filter((t) => t && typeof t.name === "string" && t.name !== "")
-      .map((t) => ({
-        id: String(t.id ?? Date.now() + Math.random()),
-        name: t.name,
-        dueDate: typeof t.dueDate === "string" ? t.dueDate : "",
-        priority: t.priority in PRIORITY_ORDER ? t.priority : "medium",
-        completed: Boolean(t.completed),
-      }));
+      .map((t) => {
+        let id = t.id ? String(t.id) : createTaskId();
+        if (seenIds.has(id)) id = createTaskId(); // idが重複していたら再採番する
+        seenIds.add(id);
+        return {
+          id,
+          name: t.name,
+          dueDate: typeof t.dueDate === "string" ? t.dueDate : "",
+          priority: t.priority in PRIORITY_ORDER ? t.priority : "medium",
+          completed: Boolean(t.completed),
+        };
+      });
   } catch {
     return [];
   }
@@ -61,7 +75,7 @@ form.addEventListener("submit", (event) => {
   formError.hidden = true;
 
   tasks.push({
-    id: String(Date.now()),
+    id: createTaskId(),
     name: name,
     dueDate: dueInput.value, // 未入力なら ""
     priority: prioritySelect.value,
@@ -139,8 +153,9 @@ function createTaskElement(task) {
     const dueEl = document.createElement("div");
     dueEl.className = "task-due";
     dueEl.textContent = "期限: " + task.dueDate.replaceAll("-", "/");
-    // 期限切れ（未完了のみ）は赤字にする
-    const today = new Date().toISOString().slice(0, 10);
+    // 期限切れ（未完了のみ）は赤字にする（toISOString はUTC基準になりズレるため使わない）
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     if (!task.completed && task.dueDate < today) {
       dueEl.classList.add("overdue");
       dueEl.textContent += "（期限切れ）";
